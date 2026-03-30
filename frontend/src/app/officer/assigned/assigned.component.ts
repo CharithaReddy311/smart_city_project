@@ -9,131 +9,155 @@ import { AuthService } from '../../services/auth.service';
   standalone: true,
   imports: [CommonModule],
   template: `
-    <div class="page">
-      <div class="topbar">
-        <span class="brand">CivicPulse Officer</span>
-        <span class="user">{{ auth.getUsername() }}</span>
-        <button (click)="auth.logout()">Logout</button>
-      </div>
-      <div class="body">
-        <h2>Assigned to Me
-          <span class="count">{{ grievances.length }}</span>
-        </h2>
+    <div class="app-layout">
+      <aside class="sidebar">
+        <div class="sidebar-brand">
+          <div class="brand-dot">🏙️</div>
+          <div class="brand-text">Civic<span>Pulse</span></div>
+        </div>
+        <div class="user-pill">
+          <div class="user-dot" style="background:#a78bfa"></div>
+          <div>
+            <div class="user-role" style="color:#a78bfa">OFFICER</div>
+            <div class="user-name">&#64;{{ auth.getUsername() }}</div>
+          </div>
+        </div>
+        <div class="nav-section-label">WORK</div>
+        <div class="nav-item" (click)="router.navigate(['/officer/dashboard'])"><span class="nav-icon">🏠</span> Overview</div>
+        <div class="nav-item active"><span class="nav-icon">📋</span> Assigned to Me <span class="nav-badge" style="background:#a78bfa">{{ grievances.length }}</span></div>
+        <div class="nav-item"><span class="nav-icon">🔧</span> In Progress <span class="nav-badge">{{ inProgress }}</span></div>
+        <div class="nav-item"><span class="nav-icon">✅</span> Completed</div>
+        <div class="nav-section-label">ANALYTICS</div>
+        <div class="nav-item"><span class="nav-icon">📊</span> Analytics</div>
+        <div class="nav-section-label">INFO</div>
+        <div class="nav-item"><span class="nav-icon">👤</span> My Profile</div>
+        <div class="nav-item"><span class="nav-icon">🔔</span> Notifications <span class="nav-badge" style="background:#f59e0b">3</span></div>
+        <div class="sidebar-footer">
+          <button class="signout-btn" (click)="auth.logout()"><span>↪</span> Sign Out</button>
+        </div>
+      </aside>
 
-        <div *ngIf="grievances.length === 0" class="empty">
-          No grievances assigned to you yet.
+      <main class="main-content">
+        <div class="topnav">
+          <div>
+            <div class="page-title">Assigned Grievances</div>
+            <div class="page-date">{{ today }}</div>
+          </div>
+          <div class="topnav-right">
+            <div class="role-badge" style="border-color:#a78bfa; color:#a78bfa">OFFICER</div>
+            <div class="avatar" style="background:#7c3aed">O</div>
+          </div>
         </div>
 
-        <div class="card" *ngFor="let g of grievances"
-             [class.overdue]="isOverdue(g)">
-
-          <div class="card-top">
-            <span class="title">{{ g.title }}</span>
-            <div class="badges">
-              <span class="badge overdue-badge"
-                *ngIf="isOverdue(g)">OVERDUE</span>
-              <span class="badge priority"
-                [class]="'p' + g.priority">
-                P{{ g.priority }}
-              </span>
-              <span class="badge status"
-                [class]="g.status.toLowerCase()">
-                {{ g.status }}
-              </span>
+        <div class="page-content">
+          <div class="page-header" style="display:flex; align-items:center; justify-content:space-between;">
+            <div>
+              <h1>📋 Assigned to Me
+                <span style="font-size:16px; background:#7c3aed; color:#fff; border-radius:20px; padding:2px 12px; margin-left:8px; vertical-align:middle;">
+                  {{ grievances.length }}
+                </span>
+              </h1>
+              <p>Manage and resolve your assigned civic complaints.</p>
             </div>
           </div>
 
-          <div class="meta">
-            <span>{{ g.category }}</span> •
-            <span>{{ g.location }}</span>
+          <div *ngIf="grievances.length === 0" class="card">
+            <div class="empty-state">
+              <div class="empty-icon">✅</div>
+              <h3>No grievances assigned yet</h3>
+              <p>You will see assigned complaints here once admin assigns them to you</p>
+            </div>
           </div>
 
-          <p class="desc">{{ g.description }}</p>
+          <div *ngFor="let g of grievances" class="grievance-card"
+               [class.overdue]="isOverdue(g)">
+            <div class="gc-top">
+              <div class="g-icon" style="width:44px; height:44px;">{{ getCatIcon(g.category) }}</div>
+              <div style="flex:1; min-width:0;">
+                <div class="g-title" style="font-size:15px;">{{ g.title }}</div>
+                <div class="g-meta">📍 {{ g.location }} · 👤 {{ g.deadline ? 'Due: ' + (g.deadline | date:'dd MMM yyyy') : 'No deadline' }}</div>
+              </div>
+              <div class="g-badges" style="gap:8px; flex-shrink:0;">
+                <span class="badge badge-red" *ngIf="isOverdue(g)">OVERDUE</span>
+                <span class="badge" [ngClass]="getPriorityClass(g.priority)">P{{ g.priority }}</span>
+                <span class="badge" [ngClass]="g.status === 'PENDING' ? 'badge-new' : 'badge-progress'">
+                  {{ g.status === 'PENDING' ? 'NEW' : 'IN PROGRESS' }}
+                </span>
+              </div>
+            </div>
 
-          <div class="deadline" *ngIf="g.deadline">
-            Deadline:
-            <strong
-              [class.red]="isOverdue(g)">
-              {{ g.deadline | date:'dd MMM yyyy, hh:mm a' }}
-            </strong>
-            <span class="days-left" *ngIf="!isOverdue(g)">
-              ({{ daysLeft(g) }} days left)
-            </span>
+            <div class="gc-desc" *ngIf="g.description">{{ g.description }}</div>
+
+            <div class="gc-footer">
+              <div class="deadline-info" *ngIf="g.deadline">
+                <span style="color:#64748b; font-size:13px;">Deadline: </span>
+                <span [style.color]="isOverdue(g) ? '#f87171' : '#e2e8f0'" style="font-size:13px; font-weight:600;">
+                  {{ g.deadline | date:'dd MMM yyyy, hh:mm a' }}
+                </span>
+                <span style="color:#0d9488; font-size:12px; margin-left:8px;" *ngIf="!isOverdue(g)">
+                  ({{ daysLeft(g) }} days left)
+                </span>
+              </div>
+              <button (click)="router.navigate(['/officer/resolve', g.id])"
+                style="padding:8px 20px; background:#7c3aed; border:none; border-radius:8px; color:#fff; font-size:13px; font-weight:600; cursor:pointer;">
+                Update Status →
+              </button>
+            </div>
           </div>
-
-          <button (click)="
-            router.navigate(['/officer/resolve', g.id])">
-            Update Status
-          </button>
         </div>
-      </div>
+      </main>
     </div>
   `,
+  styleUrls: ['../../../styles/shared-layout.scss'],
   styles: [`
-    .page { min-height:100vh; background:#f0f4f8; }
-    .topbar { background:#7c3aed; color:#fff; padding:14px 24px;
-      display:flex; align-items:center; gap:12px; }
-    .brand { flex:1; font-size:18px; font-weight:600; }
-    .user  { font-size:13px; opacity:0.85; }
-    .topbar button { padding:6px 14px; background:#fff; color:#7c3aed;
-      border:none; border-radius:6px; cursor:pointer; }
-    .body { padding:24px; max-width:820px; margin:0 auto; }
-    h2 { color:#7c3aed; margin-bottom:16px;
-      display:flex; align-items:center; gap:10px; }
-    .count { background:#7c3aed; color:#fff; font-size:13px;
-      padding:2px 10px; border-radius:20px; }
-    .card { background:#fff; border-radius:14px; padding:20px;
-      margin-bottom:14px;
-      box-shadow:0 2px 8px rgba(0,0,0,0.06);
-      border-left:4px solid #e2e8f0; }
-    .card.overdue { border-left:4px solid #ef4444;
-      background:#fff5f5; }
-    .card-top { display:flex; justify-content:space-between;
-      align-items:flex-start; margin-bottom:8px; }
-    .title { font-weight:600; color:#1e293b; font-size:15px; }
-    .badges { display:flex; gap:6px; flex-wrap:wrap; }
-    .badge { font-size:10px; padding:3px 8px;
-      border-radius:20px; font-weight:600; }
-    .overdue-badge { background:#fee2e2; color:#991b1b; }
-    .priority.p1 { background:#dcfce7; color:#166534; }
-    .priority.p2 { background:#fef3c7; color:#92400e; }
-    .priority.p3 { background:#fee2e2; color:#991b1b; }
-    .status.in_progress { background:#dbeafe; color:#1e40af; }
-    .status.pending { background:#fef3c7; color:#92400e; }
-    .meta { font-size:12px; color:#94a3b8; margin-bottom:8px; }
-    .desc { font-size:13px; color:#64748b; margin-bottom:12px; }
-    .deadline { font-size:12px; color:#475569; margin-bottom:12px; }
-    .deadline strong.red { color:#ef4444; }
-    .days-left { color:#0d9488; margin-left:6px; }
-    button { padding:8px 18px; background:#7c3aed; color:#fff;
-      border:none; border-radius:8px; cursor:pointer; font-size:13px; }
-    .empty { text-align:center; color:#94a3b8; margin-top:60px; }
+    :host { display: block; }
+    .grievance-card {
+      background: #161d2e; border: 1px solid #1e293b; border-radius: 12px;
+      padding: 18px 20px; margin-bottom: 14px;
+      border-left: 4px solid #1e293b; transition: border-color 0.2s;
+    }
+    .grievance-card:hover { border-left-color: #7c3aed; }
+    .grievance-card.overdue { border-left-color: #ef4444; background: #1a1010; }
+    .gc-top { display: flex; align-items: center; gap: 14px; margin-bottom: 10px; }
+    .gc-desc { font-size: 13px; color: #64748b; padding: 0 0 10px 58px; line-height: 1.5; }
+    .gc-footer { display: flex; align-items: center; justify-content: space-between; padding-top: 10px; border-top: 1px solid #1e293b; }
+    .deadline-info { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
+    .badge-red { background: rgba(239,68,68,0.15); color: #f87171; border: 1px solid rgba(239,68,68,0.3); }
   `]
 })
 export class AssignedComponent implements OnInit {
   grievances: any[] = [];
+  inProgress = 0;
+  today = new Date().toLocaleDateString('en-US', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
 
-  constructor(private os: OfficerService,
-              public auth: AuthService,
-              public router: Router) {}
+  constructor(private os: OfficerService, public auth: AuthService, public router: Router) {}
 
   ngOnInit() {
     this.os.getAssigned().subscribe({
-      next: data => this.grievances = data,
+      next: d => {
+        this.grievances = d;
+        this.inProgress = d.filter((g: any) => g.status === 'IN_PROGRESS').length;
+      },
       error: () => {}
     });
   }
 
   isOverdue(g: any): boolean {
-    if (!g.deadline) return false;
-    return new Date(g.deadline) < new Date()
-      && g.status !== 'RESOLVED';
+    return g.deadline && new Date(g.deadline) < new Date() && g.status !== 'RESOLVED';
   }
 
   daysLeft(g: any): number {
-    if (!g.deadline) return 0;
-    const diff = new Date(g.deadline).getTime()
-      - new Date().getTime();
-    return Math.ceil(diff / (1000 * 60 * 60 * 24));
+    return Math.ceil((new Date(g.deadline).getTime() - Date.now()) / 86400000);
+  }
+
+  getCatIcon(cat: string): string {
+    const m: any = { WATER: '💧', ROAD: '🛣️', SANITATION: '🗑️', ELECTRICITY: '⚡', STREET_LIGHT: '💡', OTHER: '📋' };
+    return m[cat] || '📋';
+  }
+
+  getPriorityClass(p: number): string {
+    if (p >= 3) return 'badge-high';
+    if (p === 2) return 'badge-medium';
+    return 'badge-low';
   }
 }

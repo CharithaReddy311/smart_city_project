@@ -1,166 +1,199 @@
-import { Component, OnInit } from '@angular/core';
+import { Component } from '@angular/core';
+import { FormBuilder, FormGroup, Validators, ReactiveFormsModule } from '@angular/forms';
 import { CommonModule } from '@angular/common';
 import { Router } from '@angular/router';
-import { GrievanceService } from '../../services/grievance.service';
+import { HttpClient } from '@angular/common/http';
 import { AuthService } from '../../services/auth.service';
 
 @Component({
-  selector: 'app-my-complaints',
+  selector: 'app-grievance-submit',
   standalone: true,
-  imports: [CommonModule],
+  imports: [ReactiveFormsModule, CommonModule],
   template: `
-    <div class="page">
-      <div class="topbar">
-        <span class="brand">CivicPulse</span>
-        <button (click)="router.navigate(['/citizen/dashboard'])">
-          Dashboard
-        </button>
-        <button (click)="auth.logout()">Logout</button>
-      </div>
-      <div class="body">
-        <div class="header-row">
-          <h2>My Complaints</h2>
-          <button class="new-btn"
-            (click)="router.navigate(['/citizen/submit'])">
-            + New Complaint
-          </button>
+    <div class="app-layout">
+      <aside class="sidebar">
+        <div class="sidebar-brand">
+          <div class="brand-dot">🏙️</div>
+          <div class="brand-text">Civic<span>Pulse</span></div>
+        </div>
+        <div class="user-pill">
+          <div class="user-dot"></div>
+          <div>
+            <div class="user-role">CITIZEN</div>
+            <div class="user-name">&#64;{{ auth.getUsername() }}</div>
+          </div>
+        </div>
+        <div class="nav-section-label">MAIN</div>
+        <div class="nav-item" (click)="router.navigate(['/citizen/dashboard'])"><span class="nav-icon">🏠</span> Overview</div>
+        <div class="nav-item active"><span class="nav-icon">➕</span> Submit Grievance</div>
+        <div class="nav-item" (click)="router.navigate(['/citizen/my-complaints'])"><span class="nav-icon">☰</span> My Grievances</div>
+        <div class="nav-section-label">ACCOUNT</div>
+        <div class="nav-item"><span class="nav-icon">⭐</span> Feedback & Ratings</div>
+        <div class="nav-item"><span class="nav-icon">👤</span> My Profile</div>
+        <div class="nav-item"><span class="nav-icon">🔔</span> Notifications <span class="nav-badge" style="background:#f59e0b">2</span></div>
+        <div class="sidebar-footer">
+          <button class="signout-btn" (click)="auth.logout()"><span>↪</span> Sign Out</button>
+        </div>
+      </aside>
+
+      <main class="main-content">
+        <div class="topnav">
+          <div>
+            <div class="page-title">Submit Grievance</div>
+            <div class="page-date">{{ today }}</div>
+          </div>
+          <div class="topnav-right">
+            <div class="role-badge">CITIZEN</div>
+            <div class="avatar">{{ auth.getUsername()?.[0]?.toUpperCase() }}</div>
+          </div>
         </div>
 
-        <div *ngIf="grievances.length === 0" class="empty">
-          No complaints submitted yet.
-          <br/>
-          <button class="new-btn" style="margin-top:16px"
-            (click)="router.navigate(['/citizen/submit'])">
-            Submit your first complaint
-          </button>
+        <div class="page-content">
+          <div class="page-header">
+            <h1>📝 File a New Grievance</h1>
+            <p>Report a civic issue in your area. We'll track it until resolved.</p>
+          </div>
+
+          <div class="card" style="max-width:720px;">
+            <div class="card-header">
+              <div class="card-title">Grievance Details</div>
+              <div class="stat-chip chip-teal">Step 1 of 1</div>
+            </div>
+
+            <div style="padding:24px;">
+              <form [formGroup]="form" (ngSubmit)="onSubmit()">
+
+                <div class="form-group">
+                  <label class="form-label">Issue Title *</label>
+                  <input class="form-input" formControlName="title"
+                    placeholder="Brief description of the issue"/>
+                </div>
+
+                <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px;">
+                  <div class="form-group">
+                    <label class="form-label">Category *</label>
+                    <select class="form-select" formControlName="category">
+                      <option value="">Select category</option>
+                      <option value="WATER">💧 Water Supply</option>
+                      <option value="ROAD">🛣️ Roads & Pavement</option>
+                      <option value="SANITATION">🗑️ Sanitation</option>
+                      <option value="ELECTRICITY">⚡ Electricity</option>
+                      <option value="STREET_LIGHT">💡 Street Lights</option>
+                      <option value="OTHER">📋 Other</option>
+                    </select>
+                  </div>
+
+                  <div class="form-group">
+                    <label class="form-label">Location *</label>
+                    <div style="display:flex; gap:8px;">
+                      <input class="form-input" formControlName="location" placeholder="Area or address" style="flex:1;"/>
+                      <button type="button" (click)="detectLocation()"
+                        style="padding:0 14px; background:#1e293b; border:1px solid #334155; border-radius:10px; color:#94a3b8; cursor:pointer; white-space:nowrap; font-size:13px;">
+                        📍 GPS
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="form-group">
+                  <label class="form-label">Description *</label>
+                  <textarea class="form-textarea" formControlName="description" rows="4"
+                    placeholder="Describe the issue in detail — when it started, severity, impact on residents..."></textarea>
+                </div>
+
+                <div class="form-group">
+                  <label class="form-label">Upload Image (optional)</label>
+                  <div class="upload-zone" (click)="fileInput.click()" [class.has-file]="selectedFile">
+                    <input #fileInput type="file" accept="image/*" style="display:none"
+                      (change)="onFileSelect($event)"/>
+                    <div *ngIf="!selectedFile" style="text-align:center;">
+                      <div style="font-size:32px; margin-bottom:8px;">📷</div>
+                      <div style="font-size:14px; color:#475569;">Click to upload photo evidence</div>
+                      <div style="font-size:12px; color:#334155; margin-top:4px;">PNG, JPG up to 10MB</div>
+                    </div>
+                    <div *ngIf="selectedFile" style="text-align:center; color:#0d9488;">
+                      <div style="font-size:24px; margin-bottom:6px;">✅</div>
+                      <div style="font-size:13px; font-weight:600;">{{ selectedFile.name }}</div>
+                    </div>
+                  </div>
+                </div>
+
+                <div *ngIf="success" class="msg-success">{{ success }}</div>
+                <div *ngIf="error" class="msg-error">{{ error }}</div>
+
+                <div style="display:flex; gap:12px;">
+                  <button type="submit" class="submit-btn" [disabled]="form.invalid || loading">
+                    {{ loading ? 'Submitting...' : '📤 Submit Grievance' }}
+                  </button>
+                  <button type="button"
+                    style="padding:12px 24px; background:#1e293b; border:1px solid #334155; border-radius:10px; color:#94a3b8; cursor:pointer; font-size:14px;"
+                    (click)="router.navigate(['/citizen/dashboard'])">
+                    Cancel
+                  </button>
+                </div>
+
+              </form>
+            </div>
+          </div>
         </div>
-
-        <div class="card" *ngFor="let g of grievances">
-          <div class="card-top">
-            <span class="title">{{ g.title }}</span>
-            <span class="badge" [ngClass]="getBadgeClass(g.status)">
-              {{ g.status | titlecase }}
-            </span>
-          </div>
-
-          <div class="meta">
-            <span class="tag cat">{{ g.category }}</span>
-            <span class="tag loc">{{ g.location }}</span>
-            <span class="tag date">
-              {{ g.submissionDate | date:'dd MMM yyyy' }}
-            </span>
-          </div>
-
-          <p class="desc">{{ g.description }}</p>
-
-          <div class="note" *ngIf="g.resolutionNote">
-            Resolution note: {{ g.resolutionNote }}
-          </div>
-
-          <!-- Status timeline -->
-          <div class="timeline">
-            <div class="step" [class.active]="true">
-              <div class="dot"></div>
-              <span>Submitted</span>
-            </div>
-            <div class="line"
-              [class.active]="g.status !== 'PENDING'"></div>
-            <div class="step"
-              [class.active]="g.status === 'IN_PROGRESS'
-                || g.status === 'RESOLVED'">
-              <div class="dot"></div>
-              <span>In Progress</span>
-            </div>
-            <div class="line"
-              [class.active]="g.status === 'RESOLVED'"></div>
-            <div class="step" [class.active]="g.status === 'RESOLVED'">
-              <div class="dot"></div>
-              <span>Resolved</span>
-            </div>
-          </div>
-
-          <!-- Feedback button — only for RESOLVED -->
-          <div class="actions" *ngIf="g.status === 'RESOLVED'">
-            <button class="feedback-btn"
-              (click)="router.navigate(['/citizen/feedback', g.id])">
-              Rate this Resolution
-            </button>
-          </div>
-
-          <!-- Reopen already handled via feedback page -->
-        </div>
-      </div>
+      </main>
     </div>
   `,
+  styleUrls: ['../../../styles/shared-layout.scss'],
   styles: [`
-    .page { min-height:100vh; background:#f0f4f8; }
-    .topbar { background:#0d9488; color:#fff; padding:14px 24px;
-      display:flex; align-items:center; gap:12px; }
-    .brand { flex:1; font-size:18px; font-weight:600; }
-    .topbar button { padding:6px 14px; background:#fff; color:#0d9488;
-      border:none; border-radius:6px; cursor:pointer; font-size:13px; }
-    .body { padding:24px; max-width:820px; margin:0 auto; }
-    .header-row { display:flex; align-items:center;
-      justify-content:space-between; margin-bottom:20px; }
-    h2 { color:#0d9488; margin:0; }
-    .new-btn { background:#0d9488; color:#fff; padding:8px 18px;
-      border:none; border-radius:8px; cursor:pointer; font-size:14px; }
-    .card { background:#fff; border-radius:14px; padding:20px;
-      margin-bottom:16px;
-      box-shadow:0 2px 10px rgba(0,0,0,0.07); }
-    .card-top { display:flex; align-items:center;
-      justify-content:space-between; margin-bottom:10px; }
-    .title { font-weight:600; font-size:15px; color:#1e293b; }
-    .badge { font-size:11px; padding:4px 12px;
-      border-radius:20px; font-weight:500; }
-    .badge.pending    { background:#fef3c7; color:#92400e; }
-    .badge.in_progress { background:#dbeafe; color:#1e40af; }
-    .badge.resolved   { background:#dcfce7; color:#166534; }
-    .badge.reopened   { background:#fee2e2; color:#991b1b; }
-    .meta { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:10px; }
-    .tag { font-size:11px; padding:3px 10px; border-radius:20px; }
-    .cat  { background:#e0f2fe; color:#0369a1; }
-    .loc  { background:#f1f5f9; color:#475569; }
-    .date { background:#f1f5f9; color:#475569; }
-    .desc { font-size:13px; color:#64748b;
-      margin:0 0 12px; line-height:1.5; }
-    .note { font-size:12px; color:#0d9488; background:#f0fdf4;
-      padding:8px 12px; border-radius:8px; margin-bottom:12px; }
-    .timeline { display:flex; align-items:center;
-      gap:0; margin:14px 0 10px; }
-    .step { display:flex; flex-direction:column;
-      align-items:center; gap:4px; }
-    .step .dot { width:14px; height:14px; border-radius:50%;
-      background:#e2e8f0; border:2px solid #cbd5e1; }
-    .step.active .dot { background:#0d9488; border-color:#0d9488; }
-    .step span { font-size:10px; color:#94a3b8; white-space:nowrap; }
-    .step.active span { color:#0d9488; font-weight:500; }
-    .line { flex:1; height:2px; background:#e2e8f0; min-width:40px; }
-    .line.active { background:#0d9488; }
-    .actions { margin-top:12px; }
-    .feedback-btn { padding:8px 18px; background:#f59e0b; color:#fff;
-      border:none; border-radius:8px; cursor:pointer;
-      font-size:13px; font-weight:500; }
-    .feedback-btn:hover { background:#d97706; }
-    .empty { text-align:center; color:#94a3b8;
-      margin-top:60px; font-size:15px; }
+    :host { display: block; }
+    .upload-zone {
+      border: 2px dashed #1e293b; border-radius: 12px; padding: 32px 20px;
+      cursor: pointer; transition: all 0.2s; background: #0d1117;
+    }
+    .upload-zone:hover { border-color: #0d9488; }
+    .upload-zone.has-file { border-color: #0d9488; background: rgba(13,148,136,0.05); }
   `]
 })
-export class MyComplaintsComponent implements OnInit {
-  grievances: any[] = [];
+export class GrievanceSubmitComponent {
+  form: FormGroup;
+  selectedFile: File | null = null;
+  error = ''; success = ''; loading = false;
+  today = new Date().toLocaleDateString('en-US', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
 
-  constructor(private gs: GrievanceService,
-              public auth: AuthService,
-              public router: Router) {}
-
-  ngOnInit() {
-    this.gs.getMyGrievances().subscribe({
-      next: data => this.grievances = data,
-      error: () => {}
+  constructor(private fb: FormBuilder, private http: HttpClient, public auth: AuthService, public router: Router) {
+    this.form = this.fb.group({
+      title:       ['', Validators.required],
+      category:    ['', Validators.required],
+      location:    ['', Validators.required],
+      description: ['', Validators.required]
     });
   }
 
-  getBadgeClass(status: string): string {
-    return status?.toLowerCase().replace('_', '_') || '';
+  onFileSelect(event: any) {
+    const file = event.target.files[0];
+    if (file) this.selectedFile = file;
+  }
+
+  detectLocation() {
+    if (!navigator.geolocation) { this.error = 'GPS not supported'; return; }
+    navigator.geolocation.getCurrentPosition(
+      pos => this.form.patchValue({ location: `${pos.coords.latitude.toFixed(4)}, ${pos.coords.longitude.toFixed(4)}` }),
+      () => this.error = 'Could not get location'
+    );
+  }
+
+  onSubmit() {
+    this.error = ''; this.success = ''; this.loading = true;
+    const fd = new FormData();
+    fd.append('title', this.form.value.title);
+    fd.append('description', this.form.value.description);
+    fd.append('category', this.form.value.category);
+    fd.append('location', this.form.value.location);
+    if (this.selectedFile) fd.append('image', this.selectedFile);
+
+    this.http.post('http://localhost:8080/api/citizen/grievance/submit', fd).subscribe({
+      next: () => {
+        this.loading = false;
+        this.success = 'Grievance submitted successfully!';
+        setTimeout(() => this.router.navigate(['/citizen/my-complaints']), 1500);
+      },
+      error: () => { this.loading = false; this.error = 'Submission failed. Please try again.'; }
+    });
   }
 }
