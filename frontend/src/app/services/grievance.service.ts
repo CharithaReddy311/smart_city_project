@@ -1,5 +1,6 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
+import { catchError, throwError } from 'rxjs';
 
 @Injectable({ providedIn: 'root' })
 export class GrievanceService {
@@ -19,7 +20,14 @@ export class GrievanceService {
 
   getAllGrievances() {
     return this.http.get<any[]>(
-      `${this.API}/admin/grievance/all`);
+      `${this.API}/admin/grievance/all`).pipe(
+      catchError(err => {
+        if (err?.status === 404) {
+          return this.http.get<any[]>(`${this.API}/admin/grievances/all`);
+        }
+        return throwError(() => err);
+      })
+    );
   }
 
   getById(id: number) {

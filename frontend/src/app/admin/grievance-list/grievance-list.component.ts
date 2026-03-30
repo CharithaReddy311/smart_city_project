@@ -1,9 +1,10 @@
-import { Component, OnInit } from '@angular/core';
-import { CommonModule } from '@angular/common';
+import { ChangeDetectorRef, Component, OnInit } from '@angular/core';
+import { CommonModule, isPlatformBrowser } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { GrievanceService } from '../../services/grievance.service';
 import { AuthService } from '../../services/auth.service';
+import { Inject, PLATFORM_ID } from '@angular/core';
 
 @Component({
   selector: 'app-grievance-list',
@@ -26,8 +27,8 @@ import { AuthService } from '../../services/auth.service';
         <div class="nav-section-label">MANAGEMENT</div>
         <div class="nav-item" (click)="router.navigate(['/admin/dashboard'])"><span class="nav-icon">🏠</span> Dashboard</div>
         <div class="nav-item active"><span class="nav-icon">☰</span> All Grievances <span class="nav-badge">{{ all.length }}</span></div>
-        <div class="nav-item" (click)="router.navigate(['/admin/grievances'])"><span class="nav-icon">👤</span> Assign Officers <span class="nav-badge" style="background:#f59e0b">{{ pendingCount }}</span></div>
-        <div class="nav-item"><span class="nav-icon">👥</span> Manage Users</div>
+        <div class="nav-item" (click)="router.navigate(['/admin/assign-officers'])"><span class="nav-icon">👤</span> Assign Officers <span class="nav-badge" style="background:#f59e0b">{{ unassignedCount }}</span></div>
+        <div class="nav-item" (click)="router.navigate(['/admin/users'])"><span class="nav-icon">👥</span> Manage Users</div>
         <div class="nav-section-label">ANALYTICS</div>
         <div class="nav-item" (click)="router.navigate(['/admin/analytics'])"><span class="nav-icon">📊</span> Analytics & Reports</div>
         <div class="nav-item"><span class="nav-icon">⚙️</span> System Settings</div>
@@ -104,7 +105,6 @@ import { AuthService } from '../../services/auth.service';
                   <th>Status</th>
                   <th>Priority</th>
                   <th>Date</th>
-                  <th>Action</th>
                 </tr>
               </thead>
               <tbody>
@@ -123,15 +123,10 @@ import { AuthService } from '../../services/auth.service';
                     <span class="badge" [ngClass]="getPriorityClass(g.priority)">{{ getPriorityLabel(g.priority) }}</span>
                   </td>
                   <td>{{ g.submissionDate | date:'dd MMM' }}</td>
-                  <td>
-                    <button (click)="router.navigate(['/admin/assign', g.id])"
-                      style="padding:6px 14px; background:#0d9488; border:none; border-radius:6px; color:#fff; font-size:12px; font-weight:600; cursor:pointer;">
-                      Assign
-                    </button>
-                  </td>
                 </tr>
               </tbody>
             </table>
+            <p class="error-text" *ngIf="loadError">{{ loadError }}</p>
           </div>
         </div>
       </main>
@@ -141,28 +136,67 @@ import { AuthService } from '../../services/auth.service';
   styles: [`
     :host { display: block; }
     .stats-grid { display: grid; grid-template-columns: repeat(4,1fr); gap:16px; }
+    .error-text { color: #fca5a5; font-size: 12px; margin: 10px 0 0; }
   `]
 })
 export class GrievanceListComponent implements OnInit {
   all: any[] = [];
   filtered: any[] = [];
+  loadError = '';
   searchTerm = ''; statusFilter = '';
-  pendingCount = 0; progressCount = 0; resolvedCount = 0;
+  pendingCount = 0; progressCount = 0; resolvedCount = 0; unassignedCount = 0;
   today = new Date().toLocaleDateString('en-US', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
   String = String;
 
-  constructor(private gs: GrievanceService, public auth: AuthService, public router: Router) {}
+  constructor(
+    private gs: GrievanceService,
+    private cdr: ChangeDetectorRef,
+    public auth: AuthService,
+    public router: Router,
+    @Inject(PLATFORM_ID) private platformId: Object
+  ) {}
 
   ngOnInit() {
+    if (!isPlatformBrowser(this.platformId)) {
+      return;
+    }
+    queueMicrotask(() => {
+      this.loadGrievances();
+    });
+  }
+
+  loadGrievances() {
+    this.loadError = '';
     this.gs.getAllGrievances().subscribe({
       next: d => {
-        this.all = d; this.filtered = d;
-        this.pendingCount  = d.filter((g: any) => g.status === 'PENDING').length;
-        this.progressCount = d.filter((g: any) => g.status === 'IN_PROGRESS').length;
-        this.resolvedCount = d.filter((g: any) => g.status === 'RESOLVED').length;
+        const rows = this.toArray(d);
+        this.all = rows;
+        this.filtered = rows;
+        this.pendingCount  = rows.filter((g: any) => g.status === 'PENDING').length;
+        this.progressCount = rows.filter((g: any) => g.status === 'IN_PROGRESS').length;
+        this.resolvedCount = rows.filter((g: any) => g.status === 'RESOLVED').length;
+        this.unassignedCount = rows.filter((g: any) => !g.assignedOfficerId).length;
+        this.cdr.detectChanges();
       },
-      error: () => {}
+      error: () => {
+        this.all = [];
+        this.filtered = [];
+        this.pendingCount = 0;
+        this.progressCount = 0;
+        this.resolvedCount = 0;
+        this.unassignedCount = 0;
+        this.loadError = 'Unable to load grievances from API.';
+        this.cdr.detectChanges();
+      }
     });
+  }
+
+  private toArray(data: any): any[] {
+    if (Array.isArray(data)) return data;
+    if (Array.isArray(data?.content)) return data.content;
+    if (Array.isArray(data?.data)) return data.data;
+    if (Array.isArray(data?.items)) return data.items;
+    return [];
   }
 
   applyFilter() {

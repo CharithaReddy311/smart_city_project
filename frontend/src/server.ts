@@ -41,9 +41,13 @@ app.use(
 app.use((req, res, next) => {
   angularApp
     .handle(req)
-    .then((response) =>
-      response ? writeResponseToNodeResponse(response, res) : next(),
-    )
+    .then((response) => {
+      if (response) {
+        return writeResponseToNodeResponse(response, res);
+      }
+      // Fallback to SPA entry for client-side routes.
+      return res.sendFile(join(browserDistFolder, 'index.html'));
+    })
     .catch(next);
 });
 

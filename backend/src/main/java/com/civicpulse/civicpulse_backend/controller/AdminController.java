@@ -2,6 +2,7 @@ package com.civicpulse.civicpulse_backend.controller;
 
 import com.civicpulse.civicpulse_backend.model.*;
 import com.civicpulse.civicpulse_backend.service.AdminService;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import java.util.List;
@@ -32,5 +33,25 @@ public class AdminController {
     @GetMapping("/departments")
     public ResponseEntity<List<Department>> departments() {
         return ResponseEntity.ok(adminService.getAllDepartments());
+    }
+
+    @GetMapping({"/users", "/user/all"})
+    public ResponseEntity<List<User>> users() {
+        return ResponseEntity.ok(adminService.getAllUsers());
+    }
+
+    @DeleteMapping({"/users/{id}", "/user/{id}"})
+    public ResponseEntity<?> deleteUser(@PathVariable Long id) {
+        try {
+            adminService.deleteUser(id);
+            return ResponseEntity.ok(Map.of("message", "User deleted successfully"));
+        } catch (RuntimeException e) {
+            if ("User not found".equals(e.getMessage())) {
+                return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                        .body(Map.of("error", e.getMessage()));
+            }
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(Map.of("error", e.getMessage()));
+        }
     }
 }

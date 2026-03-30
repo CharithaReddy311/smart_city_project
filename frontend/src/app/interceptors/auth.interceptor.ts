@@ -1,8 +1,16 @@
 import { HttpInterceptorFn } from '@angular/common/http';
+import { inject, PLATFORM_ID } from '@angular/core';
+import { isPlatformBrowser } from '@angular/common';
 
 export const authInterceptor: HttpInterceptorFn = (req, next) => {
+  const platformId = inject(PLATFORM_ID);
+
   // Auth endpoints are public and should not carry stale tokens.
   if (req.url.includes('/api/auth/')) {
+    return next(req);
+  }
+
+  if (!isPlatformBrowser(platformId)) {
     return next(req);
   }
 
