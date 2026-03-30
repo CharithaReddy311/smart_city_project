@@ -6,7 +6,7 @@ import { HttpClient } from '@angular/common/http';
 import { AuthService } from '../../services/auth.service';
 
 @Component({
-  selector: 'app-grievance-submit',
+  selector: 'app-my-complaints',
   standalone: true,
   imports: [ReactiveFormsModule, CommonModule],
   template: `
@@ -150,7 +150,7 @@ import { AuthService } from '../../services/auth.service';
     .upload-zone.has-file { border-color: #0d9488; background: rgba(13,148,136,0.05); }
   `]
 })
-export class GrievanceSubmitComponent {
+export class MyComplaintsComponent {
   form: FormGroup;
   selectedFile: File | null = null;
   error = ''; success = ''; loading = false;
