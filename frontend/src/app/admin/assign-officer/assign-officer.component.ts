@@ -26,7 +26,7 @@ import { AuthService } from '../../services/auth.service';
         <div class="nav-section-label">MANAGEMENT</div>
         <div class="nav-item" (click)="router.navigate(['/admin/dashboard'])"><span class="nav-icon">🏠</span> Dashboard</div>
         <div class="nav-item" (click)="router.navigate(['/admin/grievances'])"><span class="nav-icon">☰</span> All Grievances <span class="nav-badge">{{ total }}</span></div>
-        <div class="nav-item active"><span class="nav-icon">👤</span> Assign Officers <span class="nav-badge" style="background:#f59e0b">{{ active.length }}</span></div>
+        <div class="nav-item active"><span class="nav-icon">👤</span> Assign Officers <span class="nav-badge" style="background:#f59e0b">{{ activeCount }}</span></div>
         <div class="nav-item" (click)="router.navigate(['/admin/users'])"><span class="nav-icon">👥</span> Manage Users</div>
         <div class="nav-section-label">ANALYTICS</div>
         <div class="nav-item" (click)="router.navigate(['/admin/analytics'])"><span class="nav-icon">📊</span> Analytics & Reports</div>
@@ -68,29 +68,50 @@ import { AuthService } from '../../services/auth.service';
           </div>
 
           <div class="card">
-            <div *ngIf="active.length === 0" class="empty-state">
-              <div class="empty-icon">📭</div>
-              <h3>No active grievances</h3>
+            <div style="display:flex; gap:10px; flex-wrap:wrap; margin-bottom:14px;">
+              <select [(ngModel)]="statusFilter" (ngModelChange)="applyFilters()" style="min-width:180px; padding:7px 9px; border:1px solid #334155; border-radius:6px; background:#0f172a; color:#e2e8f0;">
+                <option value="ALL">All Statuses</option>
+                <option value="PENDING">Pending</option>
+                <option value="IN_PROGRESS">In Progress</option>
+                <option value="RESOLVED">Resolved</option>
+                <option value="REOPENED">Reopened</option>
+              </select>
+              <select [(ngModel)]="categoryFilter" (ngModelChange)="applyFilters()" style="min-width:180px; padding:7px 9px; border:1px solid #334155; border-radius:6px; background:#0f172a; color:#e2e8f0;">
+                <option value="ALL">All Categories</option>
+                <option *ngFor="let c of categories" [value]="c">{{ c }}</option>
+              </select>
             </div>
 
-            <table class="data-table" *ngIf="active.length > 0">
+            <div *ngIf="filteredRows.length === 0" class="empty-state">
+              <div class="empty-icon">📭</div>
+              <h3>No grievances for selected filters</h3>
+            </div>
+
+            <table class="data-table" *ngIf="filteredRows.length > 0">
               <thead>
                 <tr>
                   <th>ID</th>
                   <th>Title</th>
+                  <th>Category</th>
                   <th>Status</th>
                   <th>Current Officer</th>
+                  <th>Department</th>
                   <th>Priority</th>
                   <th>Deadline</th>
                   <th>Assign / Change</th>
                 </tr>
               </thead>
               <tbody>
-                <tr *ngFor="let g of active">
+                <tr *ngFor="let g of filteredRows">
                   <td style="color:#60a5fa; font-weight:700; font-size:12px;">GRV-{{ String(g.id).padStart(3,'0') }}</td>
                   <td>{{ g.title }}</td>
+                  <td>{{ g.category || '-' }}</td>
                   <td><span class="badge" [ngClass]="statusClass(g.status)">{{ formatStatus(g.status) }}</span></td>
-                  <td>{{ officerName(g.assignedOfficerId) }}</td>
+                  <td>
+                    <div>{{ officerName(g.assignedOfficerId) }}</div>
+                    <div style="font-size:11px; color:#94a3b8;">{{ officerEmail(g.assignedOfficerId) }}</div>
+                  </td>
+                  <td>{{ departmentName(g.departmentId) }}</td>
                   <td>{{ priorityLabel(g.priority) }}</td>
                   <td>{{ formatDeadline(g.deadline) }}</td>
                   <td>
@@ -103,27 +124,29 @@ import { AuthService } from '../../services/auth.service';
                       </button>
                     </div>
                     <div *ngIf="!g.assignedOfficerId || isEditing(g.id)" style="display:flex; gap:8px; align-items:center;">
+                      <select [(ngModel)]="selectedDepartment[g.id]" style="min-width:150px; padding:6px 8px; border:1px solid #334155; border-radius:6px; background:#0f172a; color:#e2e8f0;">
+                        <option value="">Select Department</option>
+                        <option *ngFor="let d of departments" [value]="d.id">{{ d.name }}</option>
+                      </select>
                       <select [(ngModel)]="selectedOfficer[g.id]" style="min-width:160px; padding:6px 8px; border:1px solid #334155; border-radius:6px; background:#0f172a; color:#e2e8f0;">
                         <option value="">Select Officer</option>
-                        <option *ngFor="let o of officers" [value]="o.id">{{ o.username }}</option>
+                        <option *ngFor="let o of officers" [value]="o.id">{{ o.username }} ({{ o.email }})</option>
                       </select>
                       <select [(ngModel)]="selectedPriority[g.id]" style="min-width:110px; padding:6px 8px; border:1px solid #334155; border-radius:6px; background:#0f172a; color:#e2e8f0;">
                         <option value="1">Low</option>
-                        <option value="2">Normal</option>
+                        <option value="2">Medium</option>
                         <option value="3">High</option>
-                        <option value="4">Critical</option>
                       </select>
                       <select [(ngModel)]="selectedDeadlineDays[g.id]" style="min-width:140px; padding:6px 8px; border:1px solid #334155; border-radius:6px; background:#0f172a; color:#e2e8f0;">
                         <option value="1">1 day</option>
-                        <option value="2">2 days</option>
                         <option value="3">3 days</option>
-                        <option value="5">5 days</option>
                         <option value="7">7 days</option>
                         <option value="14">14 days</option>
+                        <option value="30">30 days</option>
                       </select>
                       <button
                         (click)="assign(g)"
-                        [disabled]="!selectedOfficer[g.id] || assigningId === g.id"
+                        [disabled]="!selectedOfficer[g.id] || !selectedDepartment[g.id] || assigningId === g.id"
                         style="padding:6px 14px; background:#0d9488; border:none; border-radius:6px; color:#fff; font-size:12px; font-weight:600; cursor:pointer;">
                         {{ assigningId === g.id ? 'Saving...' : (g.assignedOfficerId ? 'Save' : 'Assign') }}
                       </button>
@@ -155,14 +178,21 @@ import { AuthService } from '../../services/auth.service';
 export class AssignOfficerComponent implements OnInit {
   all: any[] = [];
   active: any[] = [];
+  filteredRows: any[] = [];
   officers: any[] = [];
+  departments: any[] = [];
+  categories: string[] = [];
   selectedOfficer: Record<number, string> = {};
+  selectedDepartment: Record<number, string> = {};
   selectedPriority: Record<number, string> = {};
   selectedDeadlineDays: Record<number, string> = {};
+  statusFilter = 'ALL';
+  categoryFilter = 'ALL';
   editingAssignments: Record<number, boolean> = {};
   assigningId: number | null = null;
   error = '';
   total = 0;
+  activeCount = 0;
   assignedCount = 0;
   unassignedCount = 0;
   today = new Date().toLocaleDateString('en-US', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
@@ -182,6 +212,7 @@ export class AssignOfficerComponent implements OnInit {
     }
     queueMicrotask(() => {
       this.loadOfficers();
+      this.loadDepartments();
       this.loadGrievances();
     });
   }
@@ -207,18 +238,25 @@ export class AssignOfficerComponent implements OnInit {
         this.all = rows;
         this.total = rows.length;
         this.active = rows.filter((g: any) => g.status === 'PENDING' || g.status === 'IN_PROGRESS');
-        this.active.forEach((g: any) => {
+        this.activeCount = this.active.length;
+        this.categories = Array.from(new Set(rows.map((g: any) => g.category).filter(Boolean))).sort();
+        rows.forEach((g: any) => {
           this.selectedOfficer[g.id] = g.assignedOfficerId ? String(g.assignedOfficerId) : '';
+          this.selectedDepartment[g.id] = g.departmentId ? String(g.departmentId) : this.defaultDepartmentIdForCategory(g.category);
           this.selectedPriority[g.id] = String(g.priority ?? 2);
           this.selectedDeadlineDays[g.id] = this.deriveDeadlineDays(g.deadline);
         });
         this.assignedCount = this.active.filter((g: any) => !!g.assignedOfficerId).length;
         this.unassignedCount = this.active.filter((g: any) => !g.assignedOfficerId).length;
+        this.applyFilters();
         this.cdr.detectChanges();
       },
       error: () => {
+        this.all = [];
         this.active = [];
+        this.filteredRows = [];
         this.total = 0;
+        this.activeCount = 0;
         this.error = 'Unable to load grievances.';
         this.cdr.detectChanges();
       }
@@ -227,14 +265,15 @@ export class AssignOfficerComponent implements OnInit {
 
   assign(g: any) {
     const officerId = Number(this.selectedOfficer[g.id]);
+    const departmentId = Number(this.selectedDepartment[g.id]);
     const priority = Number(this.selectedPriority[g.id] || '2');
     const deadlineDays = Number(this.selectedDeadlineDays[g.id] || '3');
-    if (!officerId) {
+    if (!officerId || !departmentId) {
       return;
     }
     this.assigningId = g.id;
     this.error = '';
-    this.adminService.assignOfficer(g.id, officerId, priority, deadlineDays).subscribe({
+    this.adminService.assignOfficer(g.id, officerId, priority, deadlineDays, departmentId).subscribe({
       next: () => {
         this.assigningId = null;
         this.editingAssignments[g.id] = false;
@@ -254,6 +293,18 @@ export class AssignOfficerComponent implements OnInit {
     return officer ? officer.username : `Officer #${id}`;
   }
 
+  officerEmail(id: number | null | undefined): string {
+    if (!id) return '-';
+    const officer = this.officers.find((o: any) => o.id === id);
+    return officer?.email || '-';
+  }
+
+  departmentName(id: number | null | undefined): string {
+    if (!id) return 'Unassigned';
+    const department = this.departments.find((d: any) => d.id === id);
+    return department ? department.name : `Department #${id}`;
+  }
+
   statusClass(s: string): string {
     const m: any = { PENDING: 'badge-pending', IN_PROGRESS: 'badge-progress', RESOLVED: 'badge-resolved' };
     return m[s] || 'badge-pending';
@@ -269,6 +320,7 @@ export class AssignOfficerComponent implements OnInit {
 
   startEdit(g: any) {
     this.selectedOfficer[g.id] = g.assignedOfficerId ? String(g.assignedOfficerId) : '';
+    this.selectedDepartment[g.id] = g.departmentId ? String(g.departmentId) : this.defaultDepartmentIdForCategory(g.category);
     this.selectedPriority[g.id] = String(g.priority ?? 2);
     this.selectedDeadlineDays[g.id] = this.deriveDeadlineDays(g.deadline);
     this.editingAssignments[g.id] = true;
@@ -279,14 +331,13 @@ export class AssignOfficerComponent implements OnInit {
   }
 
   priorityLabel(priority: number | null | undefined): string {
-    const level = Number(priority ?? 2);
+    const level = Math.max(1, Math.min(3, Number(priority ?? 2)));
     const labels: Record<number, string> = {
       1: 'Low',
-      2: 'Normal',
-      3: 'High',
-      4: 'Critical'
+      2: 'Medium',
+      3: 'High'
     };
-    return labels[level] || 'Normal';
+    return labels[level] || 'Medium';
   }
 
   formatDeadline(deadline: string | null | undefined): string {
@@ -308,11 +359,38 @@ export class AssignOfficerComponent implements OnInit {
     if (Number.isNaN(due)) return '3';
     const now = Date.now();
     const days = Math.max(1, Math.round((due - now) / (1000 * 60 * 60 * 24)));
-    const allowed = [1, 2, 3, 5, 7, 14];
+    const allowed = [1, 3, 7, 14, 30];
     const nearest = allowed.reduce((best, curr) => {
       return Math.abs(curr - days) < Math.abs(best - days) ? curr : best;
     }, 3);
     return String(nearest);
+  }
+
+  applyFilters() {
+    this.filteredRows = this.all.filter((g: any) => {
+      const statusOk = this.statusFilter === 'ALL' || g.status === this.statusFilter;
+      const categoryOk = this.categoryFilter === 'ALL' || g.category === this.categoryFilter;
+      return statusOk && categoryOk;
+    });
+  }
+
+  private loadDepartments() {
+    this.adminService.getDepartments().subscribe({
+      next: d => {
+        this.departments = this.toArray(d);
+        this.cdr.detectChanges();
+      },
+      error: () => {
+        this.departments = [];
+        this.cdr.detectChanges();
+      }
+    });
+  }
+
+  private defaultDepartmentIdForCategory(category: string | null | undefined): string {
+    if (!category || !this.departments.length) return '';
+    const match = this.departments.find((d: any) => String(d.category || '').toUpperCase() === String(category).toUpperCase());
+    return match ? String(match.id) : '';
   }
 
   private toArray(data: any): any[] {
