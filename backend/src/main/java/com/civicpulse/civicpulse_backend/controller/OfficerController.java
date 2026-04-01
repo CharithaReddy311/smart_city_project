@@ -24,6 +24,12 @@ public class OfficerController {
             officerService.getAssigned(auth.getName()));
     }
 
+    @GetMapping("/stats")
+    public ResponseEntity<Map<String, Object>> stats(Authentication auth) {
+        return ResponseEntity.ok(
+            officerService.getDashboardStats(auth.getName()));
+    }
+
     @PutMapping("/grievance/{id}/resolve")
     public ResponseEntity<Grievance> resolve(
             @PathVariable Long id,

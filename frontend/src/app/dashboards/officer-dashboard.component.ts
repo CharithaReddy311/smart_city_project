@@ -80,13 +80,17 @@ import { OfficerService } from '../services/officer.service';
           <div class="welcome-icon">🔧</div>
         </div>
 
+        <div *ngIf="error" class="card" style="margin-bottom:14px;">
+          <p style="margin:0; color:#f87171; font-size:13px;">{{ error }}</p>
+        </div>
+
         <div class="stats-grid">
           <div class="stat-card">
             <div class="stat-card-header">
               <div class="stat-icon-box" style="background:rgba(245,158,11,0.1)">📋</div>
               <div class="stat-chip chip-amber">{{ pendingCount }} pending</div>
             </div>
-            <div class="stat-num">{{ assigned.length }}</div>
+            <div class="stat-num">{{ totalAssigned }}</div>
             <div class="stat-label">Assigned Grievances</div>
           </div>
           <div class="stat-card">
@@ -108,9 +112,9 @@ import { OfficerService } from '../services/officer.service';
           <div class="stat-card">
             <div class="stat-card-header">
               <div class="stat-icon-box" style="background:rgba(245,158,11,0.1)">🏆</div>
-              <div class="stat-chip chip-green">Excellent</div>
+              <div class="stat-chip chip-green">Live</div>
             </div>
-            <div class="stat-num" style="color:#22c55e">96%</div>
+            <div class="stat-num" style="color:#22c55e">{{ slaScore }}%</div>
             <div class="stat-label">SLA Score</div>
           </div>
         </div>
@@ -176,21 +180,52 @@ import { OfficerService } from '../services/officer.service';
 })
 export class OfficerDashboardComponent implements OnInit {
   assigned: any[] = [];
+  totalAssigned = 0;
   inProgress = 0; resolvedCount = 0; pendingCount = 0;
+  slaScore = 0;
+  error = '';
   today = new Date().toLocaleDateString('en-US', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
 
   constructor(public auth: AuthService, public router: Router, private os: OfficerService) {}
 
   ngOnInit() {
+    this.error = '';
     this.os.getAssigned().subscribe({
       next: d => {
-        this.assigned = d;
-        this.inProgress   = d.filter((g: any) => g.status === 'IN_PROGRESS').length;
-        this.resolvedCount = d.filter((g: any) => g.status === 'RESOLVED').length;
-        this.pendingCount  = d.filter((g: any) => g.status === 'PENDING').length;
+        this.assigned = this.toArray(d);
+        this.applyLocalStatsFromAssigned();
       },
-      error: () => {}
+      error: () => {
+        this.assigned = [];
+        this.applyLocalStatsFromAssigned();
+        this.error = 'Unable to load assigned grievances. Please log in again as officer and ensure backend is running.';
+      }
     });
+
+    this.os.getStats().subscribe({
+      next: (stats) => {
+        // Keep count cards aligned to /assigned source of truth.
+        this.slaScore = Number(stats?.slaScore ?? 0);
+      },
+      error: () => {
+        this.slaScore = 0;
+      }
+    });
+  }
+
+  private applyLocalStatsFromAssigned() {
+    this.totalAssigned = this.assigned.length;
+    this.inProgress = this.assigned.filter((g: any) => g.status === 'IN_PROGRESS').length;
+    this.resolvedCount = this.assigned.filter((g: any) => g.status === 'RESOLVED').length;
+    this.pendingCount = this.assigned.filter((g: any) => g.status === 'PENDING').length;
+  }
+
+  private toArray(data: any): any[] {
+    if (Array.isArray(data)) return data;
+    if (Array.isArray(data?.content)) return data.content;
+    if (Array.isArray(data?.data)) return data.data;
+    if (Array.isArray(data?.items)) return data.items;
+    return [];
   }
 
   getCatIcon(cat: string): string {

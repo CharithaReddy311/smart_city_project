@@ -11,6 +11,10 @@ export class OfficerService {
     return this.http.get<any[]>(`${this.API}/assigned`);
   }
 
+  getStats() {
+    return this.http.get<any>(`${this.API}/stats`);
+  }
+
   resolve(id: number, status: string, note: string) {
     return this.http.put(`${this.API}/grievance/${id}/resolve`,
       { status, note });

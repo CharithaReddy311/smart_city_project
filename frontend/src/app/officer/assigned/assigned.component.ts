@@ -1,5 +1,6 @@
 import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { OfficerService } from '../../services/officer.service';
 import { AuthService } from '../../services/auth.service';
@@ -7,7 +8,7 @@ import { AuthService } from '../../services/auth.service';
 @Component({
   selector: 'app-assigned',
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, FormsModule],
   template: `
     <div class="app-layout">
       <aside class="sidebar">
@@ -54,22 +55,55 @@ import { AuthService } from '../../services/auth.service';
             <div>
               <h1>📋 Assigned to Me
                 <span style="font-size:16px; background:#7c3aed; color:#fff; border-radius:20px; padding:2px 12px; margin-left:8px; vertical-align:middle;">
-                  {{ grievances.length }}
+                  {{ filteredGrievances.length }}
                 </span>
               </h1>
               <p>Manage and resolve your assigned civic complaints.</p>
             </div>
           </div>
 
-          <div *ngIf="grievances.length === 0" class="card">
-            <div class="empty-state">
-              <div class="empty-icon">✅</div>
-              <h3>No grievances assigned yet</h3>
-              <p>You will see assigned complaints here once admin assigns them to you</p>
+          <div class="card" style="margin-bottom:14px;">
+            <div style="display:flex; gap:12px; align-items:end; flex-wrap:wrap;">
+              <div>
+                <label style="display:block; color:#94a3b8; font-size:12px; margin-bottom:6px;">Status</label>
+                <select [(ngModel)]="statusFilter" (ngModelChange)="applyFilters()"
+                  style="min-width:180px; padding:8px 10px; border:1px solid #334155; border-radius:8px; background:#0f172a; color:#e2e8f0;">
+                  <option value="ALL">All Status</option>
+                  <option value="PENDING">Pending</option>
+                  <option value="IN_PROGRESS">In Progress</option>
+                  <option value="RESOLVED">Resolved</option>
+                  <option value="REOPENED">Reopened</option>
+                </select>
+              </div>
+              <div>
+                <label style="display:block; color:#94a3b8; font-size:12px; margin-bottom:6px;">Category</label>
+                <select [(ngModel)]="categoryFilter" (ngModelChange)="applyFilters()"
+                  style="min-width:180px; padding:8px 10px; border:1px solid #334155; border-radius:8px; background:#0f172a; color:#e2e8f0;">
+                  <option value="ALL">All Categories</option>
+                  <option *ngFor="let c of categories" [value]="c">{{ c.replace('_', ' ') }}</option>
+                </select>
+              </div>
+              <button (click)="resetFilters()"
+                style="padding:8px 12px; background:#334155; border:none; border-radius:8px; color:#fff; font-size:12px; font-weight:600; cursor:pointer;">
+                Reset
+              </button>
+            </div>
+            <div style="margin-top:10px; color:#94a3b8; font-size:12px;">
+              Showing {{ filteredGrievances.length }} of {{ grievances.length }} grievances
             </div>
           </div>
 
-          <div *ngFor="let g of grievances" class="grievance-card"
+          <div *ngIf="error" class="card"><p class="err">{{ error }}</p></div>
+
+          <div *ngIf="!error && filteredGrievances.length === 0" class="card">
+            <div class="empty-state">
+              <div class="empty-icon">✅</div>
+              <h3>{{ grievances.length === 0 ? 'No grievances assigned yet' : 'No grievances match selected filters' }}</h3>
+              <p *ngIf="grievances.length === 0">You will see assigned complaints here once admin assigns them to you</p>
+            </div>
+          </div>
+
+          <div *ngFor="let g of filteredGrievances" class="grievance-card"
                [class.overdue]="isOverdue(g)">
             <div class="gc-top">
               <div class="g-icon" style="width:44px; height:44px;">{{ getCatIcon(g.category) }}</div>
@@ -79,9 +113,9 @@ import { AuthService } from '../../services/auth.service';
               </div>
               <div class="g-badges" style="gap:8px; flex-shrink:0;">
                 <span class="badge badge-red" *ngIf="isOverdue(g)">OVERDUE</span>
-                <span class="badge" [ngClass]="getPriorityClass(g.priority)">P{{ g.priority }}</span>
-                <span class="badge" [ngClass]="g.status === 'PENDING' ? 'badge-new' : 'badge-progress'">
-                  {{ g.status === 'PENDING' ? 'NEW' : 'IN PROGRESS' }}
+                <span class="badge" [ngClass]="getPriorityClass(g.priority)">{{ displayPriority(g.priority) }}</span>
+                <span class="badge" [ngClass]="statusClass(g.status)">
+                  {{ formatStatus(g.status) }}
                 </span>
               </div>
             </div>
@@ -94,13 +128,14 @@ import { AuthService } from '../../services/auth.service';
                 <span [style.color]="isOverdue(g) ? '#f87171' : '#e2e8f0'" style="font-size:13px; font-weight:600;">
                   {{ g.deadline | date:'dd MMM yyyy, hh:mm a' }}
                 </span>
-                <span style="color:#0d9488; font-size:12px; margin-left:8px;" *ngIf="!isOverdue(g)">
-                  ({{ daysLeft(g) }} days left)
+                <span *ngIf="!isOverdue(g) && g.status !== 'RESOLVED'" class="badge badge-countdown" style="margin-left:8px;">
+                  {{ daysLeft(g) }} day{{ daysLeft(g) === 1 ? '' : 's' }} left
                 </span>
               </div>
               <button (click)="router.navigate(['/officer/resolve', g.id])"
+                [disabled]="g.status === 'RESOLVED'"
                 style="padding:8px 20px; background:#7c3aed; border:none; border-radius:8px; color:#fff; font-size:13px; font-weight:600; cursor:pointer;">
-                Update Status →
+                {{ g.status === 'RESOLVED' ? 'Resolved' : 'Update Status →' }}
               </button>
             </div>
           </div>
@@ -123,11 +158,18 @@ import { AuthService } from '../../services/auth.service';
     .gc-footer { display: flex; align-items: center; justify-content: space-between; padding-top: 10px; border-top: 1px solid #1e293b; }
     .deadline-info { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
     .badge-red { background: rgba(239,68,68,0.15); color: #f87171; border: 1px solid rgba(239,68,68,0.3); }
+    .badge-countdown { background: rgba(13,148,136,0.15); color: #5eead4; border: 1px solid rgba(13,148,136,0.35); }
+    .err { color:#ef4444; margin:0; font-size:13px; }
   `]
 })
 export class AssignedComponent implements OnInit {
   grievances: any[] = [];
+  filteredGrievances: any[] = [];
+  categories: string[] = [];
+  statusFilter = 'ALL';
+  categoryFilter = 'ALL';
   inProgress = 0;
+  error = '';
   today = new Date().toLocaleDateString('en-US', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
 
   constructor(private os: OfficerService, public auth: AuthService, public router: Router) {}
@@ -135,11 +177,32 @@ export class AssignedComponent implements OnInit {
   ngOnInit() {
     this.os.getAssigned().subscribe({
       next: d => {
-        this.grievances = d;
-        this.inProgress = d.filter((g: any) => g.status === 'IN_PROGRESS').length;
+        const rows = this.toArray(d);
+        this.grievances = rows;
+        this.categories = Array.from(new Set(rows.map((g: any) => g.category).filter(Boolean))).sort();
+        this.inProgress = rows.filter((g: any) => g.status === 'IN_PROGRESS').length;
+        this.applyFilters();
       },
-      error: () => {}
+      error: () => {
+        this.error = 'Unable to load assigned grievances.';
+        this.grievances = [];
+        this.filteredGrievances = [];
+      }
     });
+  }
+
+  applyFilters() {
+    this.filteredGrievances = this.grievances.filter((g: any) => {
+      const statusOk = this.statusFilter === 'ALL' || g.status === this.statusFilter;
+      const categoryOk = this.categoryFilter === 'ALL' || g.category === this.categoryFilter;
+      return statusOk && categoryOk;
+    });
+  }
+
+  resetFilters() {
+    this.statusFilter = 'ALL';
+    this.categoryFilter = 'ALL';
+    this.applyFilters();
   }
 
   isOverdue(g: any): boolean {
@@ -156,8 +219,40 @@ export class AssignedComponent implements OnInit {
   }
 
   getPriorityClass(p: number): string {
-    if (p >= 3) return 'badge-high';
-    if (p === 2) return 'badge-medium';
+    const level = this.normalizePriority(p);
+    if (level >= 3) return 'badge-high';
+    if (level === 2) return 'badge-medium';
     return 'badge-low';
+  }
+
+  displayPriority(p: number): string {
+    return `P${this.normalizePriority(p)}`;
+  }
+
+  formatStatus(status: string): string {
+    if (!status) return '-';
+    return status.replace('_', ' ');
+  }
+
+  statusClass(status: string): string {
+    if (status === 'PENDING') return 'badge-new';
+    if (status === 'RESOLVED') return 'badge-resolved';
+    if (status === 'REOPENED') return 'badge-high';
+    return 'badge-progress';
+  }
+
+  private normalizePriority(priority: number): number {
+    const value = Number(priority || 1);
+    if (value <= 1) return 1;
+    if (value === 2) return 2;
+    return 3;
+  }
+
+  private toArray(data: any): any[] {
+    if (Array.isArray(data)) return data;
+    if (Array.isArray(data?.content)) return data.content;
+    if (Array.isArray(data?.data)) return data.data;
+    if (Array.isArray(data?.items)) return data.items;
+    return [];
   }
 }
