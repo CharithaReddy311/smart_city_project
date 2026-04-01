@@ -87,6 +87,10 @@ import { Inject, PLATFORM_ID } from '@angular/core';
               <option value="IN_PROGRESS">In Progress</option>
               <option value="RESOLVED">Resolved</option>
             </select>
+            <select class="filter-select" [(ngModel)]="categoryFilter" (change)="applyFilter()">
+              <option value="">All Categories</option>
+              <option *ngFor="let c of categories" [value]="c">{{ c }}</option>
+            </select>
           </div>
 
           <!-- Table -->
@@ -144,6 +148,8 @@ export class GrievanceListComponent implements OnInit {
   filtered: any[] = [];
   loadError = '';
   searchTerm = ''; statusFilter = '';
+  categoryFilter = '';
+  categories: string[] = [];
   pendingCount = 0; progressCount = 0; resolvedCount = 0; unassignedCount = 0;
   today = new Date().toLocaleDateString('en-US', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
   String = String;
@@ -172,6 +178,7 @@ export class GrievanceListComponent implements OnInit {
         const rows = this.toArray(d);
         this.all = rows;
         this.filtered = rows;
+        this.categories = Array.from(new Set(rows.map((g: any) => g.category).filter(Boolean))).sort();
         this.pendingCount  = rows.filter((g: any) => g.status === 'PENDING').length;
         this.progressCount = rows.filter((g: any) => g.status === 'IN_PROGRESS').length;
         this.resolvedCount = rows.filter((g: any) => g.status === 'RESOLVED').length;
@@ -203,7 +210,8 @@ export class GrievanceListComponent implements OnInit {
     this.filtered = this.all.filter(g => {
       const matchSearch = !this.searchTerm || g.title?.toLowerCase().includes(this.searchTerm.toLowerCase());
       const matchStatus = !this.statusFilter || g.status === this.statusFilter;
-      return matchSearch && matchStatus;
+      const matchCategory = !this.categoryFilter || g.category === this.categoryFilter;
+      return matchSearch && matchStatus && matchCategory;
     });
   }
 

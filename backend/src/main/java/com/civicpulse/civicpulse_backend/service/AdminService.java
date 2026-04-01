@@ -35,14 +35,21 @@ public class AdminService {
         int priority = body.containsKey("priority") && body.get("priority") != null
             ? Integer.valueOf(body.get("priority").toString())
             : 2;
-        g.setPriority(priority);
+        g.setPriority(Math.max(1, Math.min(3, priority)));
         g.setStatus(GrievanceStatus.IN_PROGRESS);
+
+        if (body.containsKey("departmentId") && body.get("departmentId") != null
+                && !body.get("departmentId").toString().isBlank()) {
+            g.setDepartmentId(Long.valueOf(body.get("departmentId").toString()));
+        }
 
         // SLA deadline — default 3 days, or from body
         int days = body.containsKey("deadlineDays")
             ? Integer.valueOf(body.get("deadlineDays").toString())
             : 3;
-        g.setDeadline(LocalDateTime.now().plusDays(days));
+        List<Integer> allowedDays = List.of(1, 3, 7, 14, 30);
+        int normalizedDays = allowedDays.contains(days) ? days : 3;
+        g.setDeadline(LocalDateTime.now().plusDays(normalizedDays));
 
         return grievanceRepo.save(g);
     }

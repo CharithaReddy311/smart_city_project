@@ -25,6 +25,10 @@ export class AdminService {
     return this.http.get<any[]>(`${this.API}/officers`);
   }
 
+  getDepartments() {
+    return this.http.get<any[]>(`${this.API}/departments`);
+  }
+
   getUsers() {
     return this.http.get<any[]>(`${this.API}/users`).pipe(
       catchError(err => {
@@ -48,10 +52,11 @@ export class AdminService {
   }
 
   assignOfficer(id: number, officerId: number,
-                priority: number, deadlineDays: number) {
+                priority: number, deadlineDays: number,
+                departmentId?: number) {
     return this.http.put(
       `${this.API}/grievance/${id}/assign`,
-      { officerId, priority, deadlineDays }
+      { officerId, priority, deadlineDays, departmentId }
     );
   }
 }
