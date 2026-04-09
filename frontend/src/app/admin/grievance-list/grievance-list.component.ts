@@ -86,6 +86,10 @@ import { AuthService } from '../../services/auth.service';
               <option value="IN_PROGRESS">In Progress</option>
               <option value="RESOLVED">Resolved</option>
             </select>
+            <select class="filter-select" [(ngModel)]="categoryFilter" (change)="applyFilter()">
+              <option value="">All Categories</option>
+              <option *ngFor="let cat of categoryOptions" [value]="cat">{{ cat }}</option>
+            </select>
           </div>
 
           <!-- Table -->
@@ -146,7 +150,10 @@ import { AuthService } from '../../services/auth.service';
 export class GrievanceListComponent implements OnInit {
   all: any[] = [];
   filtered: any[] = [];
-  searchTerm = ''; statusFilter = '';
+  searchTerm = '';
+  statusFilter = '';
+  categoryFilter = '';
+  categoryOptions: string[] = [];
   pendingCount = 0; progressCount = 0; resolvedCount = 0;
   today = new Date().toLocaleDateString('en-US', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
   String = String;
@@ -157,6 +164,7 @@ export class GrievanceListComponent implements OnInit {
     this.gs.getAllGrievances().subscribe({
       next: d => {
         this.all = d; this.filtered = d;
+        this.categoryOptions = [...new Set(d.map((g: any) => g.category).filter(Boolean))].sort();
         this.pendingCount  = d.filter((g: any) => g.status === 'PENDING').length;
         this.progressCount = d.filter((g: any) => g.status === 'IN_PROGRESS').length;
         this.resolvedCount = d.filter((g: any) => g.status === 'RESOLVED').length;
@@ -169,7 +177,8 @@ export class GrievanceListComponent implements OnInit {
     this.filtered = this.all.filter(g => {
       const matchSearch = !this.searchTerm || g.title?.toLowerCase().includes(this.searchTerm.toLowerCase());
       const matchStatus = !this.statusFilter || g.status === this.statusFilter;
-      return matchSearch && matchStatus;
+      const matchCategory = !this.categoryFilter || g.category === this.categoryFilter;
+      return matchSearch && matchStatus && matchCategory;
     });
   }
 
