@@ -3,9 +3,11 @@ package com.civicpulse.civicpulse_backend.service;
 import com.civicpulse.civicpulse_backend.model.*;
 import com.civicpulse.civicpulse_backend.repository.UserRepository;
 import com.civicpulse.civicpulse_backend.security.JwtUtil;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
 import java.util.Map;
 
 @Service
@@ -41,9 +43,11 @@ public class UserService {
     @Transactional(readOnly = true)
     public Map<String, String> login(String email, String password) {
         User user = userRepo.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("User not found"));
+            .orElseThrow(() -> new ResponseStatusException(
+                HttpStatus.UNAUTHORIZED, "Invalid email or password"));
         if (!passwordEncoder.matches(password, user.getPassword())) {
-            throw new RuntimeException("Invalid credentials");
+            throw new ResponseStatusException(
+                HttpStatus.UNAUTHORIZED, "Invalid email or password");
         }
         String token = jwtUtil.generateToken(email, user.getRole().name());
         return Map.of(
