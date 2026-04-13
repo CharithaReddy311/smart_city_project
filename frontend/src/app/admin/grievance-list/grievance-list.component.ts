@@ -10,11 +10,12 @@ import { AuthService } from '../../services/auth.service';
   standalone: true,
   imports: [CommonModule, FormsModule],
   template: `
-    <div class="app-layout">
+    <div class="app-layout" [class.sidebar-collapsed]="sidebarCollapsed">
       <aside class="sidebar">
         <div class="sidebar-brand">
           <div class="brand-dot">🏙️</div>
           <div class="brand-text">Civic<span>Pulse</span></div>
+          <button class="sidebar-toggle" type="button" (click)="toggleSidebar()">{{ sidebarCollapsed ? '»' : '«' }}</button>
         </div>
         <div class="user-pill">
           <div class="user-dot" style="background:#60a5fa"></div>
@@ -27,7 +28,7 @@ import { AuthService } from '../../services/auth.service';
         <div class="nav-item" (click)="router.navigate(['/admin/dashboard'])"><span class="nav-icon">🏠</span> Dashboard</div>
         <div class="nav-item active"><span class="nav-icon">☰</span> All Grievances <span class="nav-badge">{{ all.length }}</span></div>
         <div class="nav-item" (click)="router.navigate(['/admin/grievances'])"><span class="nav-icon">👤</span> Assign Officers <span class="nav-badge" style="background:#f59e0b">{{ pendingCount }}</span></div>
-        <div class="nav-item"><span class="nav-icon">👥</span> Manage Users</div>
+        <div class="nav-item" (click)="router.navigate(['/admin/users'])"><span class="nav-icon">👥</span> Manage Users</div>
         <div class="nav-section-label">ANALYTICS</div>
         <div class="nav-item" (click)="router.navigate(['/admin/analytics'])"><span class="nav-icon">📊</span> Analytics & Reports</div>
         <div class="nav-item"><span class="nav-icon">⚙️</span> System Settings</div>
@@ -98,44 +99,46 @@ import { AuthService } from '../../services/auth.service';
               <div class="empty-icon">📭</div>
               <h3>No grievances found</h3>
             </div>
-            <table class="data-table" *ngIf="filtered.length > 0">
-              <thead>
-                <tr>
-                  <th>ID</th>
-                  <th>Title</th>
-                  <th>Category</th>
-                  <th>Location</th>
-                  <th>Status</th>
-                  <th>Priority</th>
-                  <th>Date</th>
-                  <th>Action</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr *ngFor="let g of filtered">
-                  <td style="color:#60a5fa; font-weight:700; font-size:12px;">GRV-{{ String(g.id).padStart(3,'0') }}</td>
-                  <td>
-                    <div style="font-weight:600; color:#e2e8f0;">{{ g.title }}</div>
-                  </td>
-                  <td>
-                    <span style="font-size:14px;">{{ getCatIcon(g.category) }}</span>
-                    {{ g.category }}
-                  </td>
-                  <td>{{ g.location }}</td>
-                  <td><span class="badge" [ngClass]="getStatusClass(g.status)">{{ formatStatus(g.status) }}</span></td>
-                  <td>
-                    <span class="badge" [ngClass]="getPriorityClass(g.priority)">{{ getPriorityLabel(g.priority) }}</span>
-                  </td>
-                  <td>{{ g.submissionDate | date:'dd MMM' }}</td>
-                  <td>
-                    <button (click)="router.navigate(['/admin/assign', g.id])"
-                      style="padding:6px 14px; background:#0d9488; border:none; border-radius:6px; color:#fff; font-size:12px; font-weight:600; cursor:pointer;">
-                      Assign
-                    </button>
-                  </td>
-                </tr>
-              </tbody>
-            </table>
+            <div class="table-wrap" *ngIf="filtered.length > 0">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>ID</th>
+                    <th>Title</th>
+                    <th>Category</th>
+                    <th>Location</th>
+                    <th>Status</th>
+                    <th>Priority</th>
+                    <th>Date</th>
+                    <th>Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr *ngFor="let g of filtered">
+                    <td style="color:#60a5fa; font-weight:700; font-size:12px;">GRV-{{ String(g.id).padStart(3,'0') }}</td>
+                    <td>
+                      <div style="font-weight:600; color:#e2e8f0;">{{ g.title }}</div>
+                    </td>
+                    <td>
+                      <span style="font-size:14px;">{{ getCatIcon(g.category) }}</span>
+                      {{ g.category }}
+                    </td>
+                    <td>{{ g.location }}</td>
+                    <td><span class="badge" [ngClass]="getStatusClass(g.status)">{{ formatStatus(g.status) }}</span></td>
+                    <td>
+                      <span class="badge" [ngClass]="getPriorityClass(g.priority)">{{ getPriorityLabel(g.priority) }}</span>
+                    </td>
+                    <td>{{ g.submissionDate | date:'dd MMM' }}</td>
+                    <td>
+                      <button (click)="router.navigate(['/admin/assign', g.id])"
+                        style="padding:6px 14px; background:#0d9488; border:none; border-radius:6px; color:#fff; font-size:12px; font-weight:600; cursor:pointer;">
+                        Assign
+                      </button>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
       </main>
@@ -145,6 +148,7 @@ import { AuthService } from '../../services/auth.service';
   styles: [`
     :host { display: block; }
     .stats-grid { display: grid; grid-template-columns: repeat(4,1fr); gap:16px; }
+    .table-wrap { overflow-x: auto; }
   `]
 })
 export class GrievanceListComponent implements OnInit {
@@ -155,6 +159,7 @@ export class GrievanceListComponent implements OnInit {
   categoryFilter = '';
   categoryOptions: string[] = [];
   pendingCount = 0; progressCount = 0; resolvedCount = 0;
+  sidebarCollapsed = localStorage.getItem('sidebarCollapsed') === '1';
   today = new Date().toLocaleDateString('en-US', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
   String = String;
 
@@ -201,4 +206,9 @@ export class GrievanceListComponent implements OnInit {
     return 'LOW';
   }
   formatStatus(s: string): string { return s?.replace('_', ' ') || ''; }
+
+  toggleSidebar() {
+    this.sidebarCollapsed = !this.sidebarCollapsed;
+    localStorage.setItem('sidebarCollapsed', this.sidebarCollapsed ? '1' : '0');
+  }
 }

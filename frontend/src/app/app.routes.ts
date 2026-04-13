@@ -53,6 +53,11 @@ export const routes: Routes = [
     loadComponent: () => import('./analytics/analytics.component')
       .then(m => m.AnalyticsComponent) },
 
+  { path: 'admin/users',
+    canActivate: [authGuard, roleGuard], data: { roles: ['ADMIN'] },
+    loadComponent: () => import('./admin/manage-users/manage-users.component')
+      .then(m => m.ManageUsersComponent) },
+
   { path: 'officer/dashboard',
     canActivate: [authGuard, roleGuard], data: { roles: ['OFFICER'] },
     loadComponent: () => import('./dashboards/officer-dashboard.component')

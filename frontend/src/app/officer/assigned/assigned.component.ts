@@ -9,11 +9,12 @@ import { AuthService } from '../../services/auth.service';
   standalone: true,
   imports: [CommonModule],
   template: `
-    <div class="app-layout">
+    <div class="app-layout" [class.sidebar-collapsed]="sidebarCollapsed">
       <aside class="sidebar">
         <div class="sidebar-brand">
           <div class="brand-dot">🏙️</div>
           <div class="brand-text">Civic<span>Pulse</span></div>
+          <button class="sidebar-toggle" type="button" (click)="toggleSidebar()">{{ sidebarCollapsed ? '»' : '«' }}</button>
         </div>
         <div class="user-pill">
           <div class="user-dot" style="background:#a78bfa"></div>
@@ -134,6 +135,7 @@ export class AssignedComponent implements OnInit {
   grievances: any[] = [];
   inProgress = 0;
   resolvedCount = 0;
+  sidebarCollapsed = localStorage.getItem('sidebarCollapsed') === '1';
   today = new Date().toLocaleDateString('en-US', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
 
   constructor(private os: OfficerService, public auth: AuthService, public router: Router) {}
@@ -193,5 +195,10 @@ export class AssignedComponent implements OnInit {
 
   formatStatus(status: string): string {
     return status?.replace('_', ' ') || 'PENDING';
+  }
+
+  toggleSidebar() {
+    this.sidebarCollapsed = !this.sidebarCollapsed;
+    localStorage.setItem('sidebarCollapsed', this.sidebarCollapsed ? '1' : '0');
   }
 }

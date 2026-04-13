@@ -9,11 +9,12 @@ import { OfficerService } from '../services/officer.service';
   standalone: true,
   imports: [CommonModule],
   template: `
-    <div class="app-layout">
+    <div class="app-layout" [class.sidebar-collapsed]="sidebarCollapsed">
       <aside class="sidebar">
         <div class="sidebar-brand">
           <div class="brand-dot">🏙️</div>
           <div class="brand-text">Civic<span>Pulse</span></div>
+          <button class="sidebar-toggle" type="button" (click)="toggleSidebar()">{{ sidebarCollapsed ? '»' : '«' }}</button>
         </div>
         <div class="user-pill">
           <div class="user-dot" style="background:#a78bfa"></div>
@@ -177,6 +178,7 @@ import { OfficerService } from '../services/officer.service';
 export class OfficerDashboardComponent implements OnInit {
   assigned: any[] = [];
   inProgress = 0; resolvedCount = 0; pendingCount = 0;
+  sidebarCollapsed = localStorage.getItem('sidebarCollapsed') === '1';
   today = new Date().toLocaleDateString('en-US', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
 
   constructor(public auth: AuthService, public router: Router, private os: OfficerService) {}
@@ -196,5 +198,10 @@ export class OfficerDashboardComponent implements OnInit {
   getCatIcon(cat: string): string {
     const m: any = { WATER: '💧', ROAD: '🛣️', SANITATION: '🗑️', ELECTRICITY: '⚡', STREET_LIGHT: '💡', OTHER: '📋' };
     return m[cat] || '📋';
+  }
+
+  toggleSidebar() {
+    this.sidebarCollapsed = !this.sidebarCollapsed;
+    localStorage.setItem('sidebarCollapsed', this.sidebarCollapsed ? '1' : '0');
   }
 }

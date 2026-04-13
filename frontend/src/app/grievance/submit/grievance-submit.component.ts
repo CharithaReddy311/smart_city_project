@@ -7,6 +7,13 @@ import { AuthService } from '../../services/auth.service';
 import { ThemeService } from '../../services/theme.service';
 import { environment } from '../../../environments/environment';
 
+type SubmissionErrorPayload = {
+  code?: string;
+  message?: string;
+  retryAfterSeconds?: number;
+  existingGrievanceId?: number;
+};
+
 @Component({
   selector: 'app-grievance-submit',
   standalone: true,
@@ -90,6 +97,9 @@ import { environment } from '../../../environments/environment';
 
             <p class="err" *ngIf="error">{{ error }}</p>
             <p class="success" *ngIf="success">{{ success }}</p>
+            <p class="dup-note" *ngIf="existingGrievanceId">
+              Existing grievance reference: #{{ existingGrievanceId }}
+            </p>
 
             <button type="submit" class="submit-btn" [disabled]="form.invalid || loading">
               {{ loading ? 'Submitting...' : 'Submit Grievance Pulse' }}
@@ -197,6 +207,7 @@ import { environment } from '../../../environments/environment';
 
     .err { color:#FCA5A5; font-size:12px; margin-bottom:8px; }
     .success { color:#6EE7B7; font-size:12px; margin-bottom:8px; }
+    .dup-note { color:#FCD34D; font-size:12px; margin-bottom:8px; }
   `]
 })
 export class GrievanceSubmitComponent {
@@ -207,6 +218,7 @@ export class GrievanceSubmitComponent {
   error = '';
   success = '';
   loading = false;
+  existingGrievanceId: number | null = null;
 
   constructor(
     private fb: FormBuilder,
@@ -216,10 +228,10 @@ export class GrievanceSubmitComponent {
     public theme: ThemeService
   ) {
     this.form = this.fb.group({
-      title: ['', Validators.required],
+      title: ['', [Validators.required, Validators.minLength(5), Validators.maxLength(200)]],
       category: ['OTHER', Validators.required],
       location: ['', Validators.required],
-      description: ['', Validators.required]
+      description: ['', [Validators.required, Validators.minLength(10), Validators.maxLength(2000)]]
     });
   }
 
@@ -250,6 +262,7 @@ export class GrievanceSubmitComponent {
   onSubmit() {
     this.error = '';
     this.success = '';
+    this.existingGrievanceId = null;
     this.loading = true;
 
     const fd = new FormData();
@@ -267,10 +280,33 @@ export class GrievanceSubmitComponent {
           this.success = 'Grievance submitted successfully!';
           setTimeout(() => this.router.navigate(['/citizen/my-complaints']), 1500);
         },
-        error: () => {
+        error: (err) => {
           this.loading = false;
-          this.error = 'Submission failed. Try again.';
+          const apiError = (err?.error ?? {}) as SubmissionErrorPayload;
+          this.existingGrievanceId = apiError.existingGrievanceId ?? null;
+          this.error = this.mapSubmissionError(apiError);
         }
       });
+  }
+
+  private mapSubmissionError(error: SubmissionErrorPayload): string {
+    switch (error.code) {
+      case 'DUPLICATE_FOUND':
+        return error.message || 'A similar grievance was already submitted recently.';
+      case 'RATE_LIMIT_USER':
+      case 'RATE_LIMIT_IP': {
+        const mins = Math.max(1, Math.ceil((error.retryAfterSeconds ?? 0) / 60));
+        return `Submission limit reached. Please try again in ${mins} minute(s).`;
+      }
+      case 'SPAM_LOCATION_PENDING':
+        return error.message || 'You already have multiple pending grievances for this location and category.';
+      case 'INVALID_TITLE':
+      case 'INVALID_DESCRIPTION':
+      case 'INVALID_CATEGORY':
+      case 'INVALID_LOCATION':
+        return error.message || 'Please correct the form values and try again.';
+      default:
+        return 'Submission failed. Try again.';
+    }
   }
 }

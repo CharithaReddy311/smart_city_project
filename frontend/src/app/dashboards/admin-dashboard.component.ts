@@ -9,11 +9,12 @@ import { GrievanceService } from '../services/grievance.service';
   standalone: true,
   imports: [CommonModule],
   template: `
-    <div class="app-layout">
+    <div class="app-layout" [class.sidebar-collapsed]="sidebarCollapsed">
       <aside class="sidebar">
         <div class="sidebar-brand">
           <div class="brand-dot">🏙️</div>
           <div class="brand-text">Civic<span>Pulse</span></div>
+          <button class="sidebar-toggle" type="button" (click)="toggleSidebar()">{{ sidebarCollapsed ? '»' : '«' }}</button>
         </div>
         <div class="user-pill">
           <div class="user-dot" style="background:#60a5fa"></div>
@@ -35,7 +36,7 @@ import { GrievanceService } from '../services/grievance.service';
           <span class="nav-icon">👤</span> Assign Officers
           <span class="nav-badge" style="background:#f59e0b">{{ pending }}</span>
         </div>
-        <div class="nav-item">
+        <div class="nav-item" (click)="router.navigate(['/admin/users'])">
           <span class="nav-icon">👥</span> Manage Users
         </div>
 
@@ -175,6 +176,7 @@ import { GrievanceService } from '../services/grievance.service';
 export class AdminDashboardComponent implements OnInit {
   grievances: any[] = [];
   total = 0; pending = 0; inProgress = 0; resolved = 0; recent = 0; urgent = 0;
+  sidebarCollapsed = localStorage.getItem('sidebarCollapsed') === '1';
   today = new Date().toLocaleDateString('en-US', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
 
   constructor(public auth: AuthService, public router: Router, private gs: GrievanceService) {}
@@ -206,5 +208,10 @@ export class AdminDashboardComponent implements OnInit {
 
   formatStatus(s: string): string {
     return s?.replace('_', ' ') || '';
+  }
+
+  toggleSidebar() {
+    this.sidebarCollapsed = !this.sidebarCollapsed;
+    localStorage.setItem('sidebarCollapsed', this.sidebarCollapsed ? '1' : '0');
   }
 }

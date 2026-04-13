@@ -11,11 +11,12 @@ import { AuthService } from '../../services/auth.service';
   standalone: true,
   imports: [CommonModule, FormsModule],
   template: `
-    <div class="app-layout">
+    <div class="app-layout" [class.sidebar-collapsed]="sidebarCollapsed">
       <aside class="sidebar">
         <div class="sidebar-brand">
           <div class="brand-dot">🏙️</div>
           <div class="brand-text">Civic<span>Pulse</span></div>
+          <button class="sidebar-toggle" type="button" (click)="toggleSidebar()">{{ sidebarCollapsed ? '»' : '«' }}</button>
         </div>
         <div class="user-pill">
           <div class="user-dot" style="background:#a78bfa"></div>
@@ -183,6 +184,7 @@ export class ResolveComponent implements OnInit {
   success = '';
   error = '';
   isSubmitting = false;
+  sidebarCollapsed = localStorage.getItem('sidebarCollapsed') === '1';
   today = new Date().toLocaleDateString('en-US', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
 
   constructor(private route: ActivatedRoute,
@@ -265,5 +267,10 @@ export class ResolveComponent implements OnInit {
     if (status === 'RESOLVED') return 'badge-resolved';
     if (status === 'IN_PROGRESS') return 'badge-progress';
     return 'badge-pending';
+  }
+
+  toggleSidebar() {
+    this.sidebarCollapsed = !this.sidebarCollapsed;
+    localStorage.setItem('sidebarCollapsed', this.sidebarCollapsed ? '1' : '0');
   }
 }
